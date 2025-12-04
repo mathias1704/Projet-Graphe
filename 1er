@@ -1,0 +1,36 @@
+public static void chargerMatrice(String nomFichier) {
+       File file = new File(nomFichier);
+       try {
+           Scanner sc = new Scanner(file);
+           List<String> lignes = new ArrayList<>();
+           //lecture de la matrice pour déterminer la taille
+           while (sc.hasNextLine()) {
+               String l = sc.nextLine().trim();
+               if (!l.isEmpty()) lignes.add(l);
+           }
+           sc.close();
+
+
+           NOMBRE_SOMMETS = lignes.size();
+           matrice = new int[NOMBRE_SOMMETS][NOMBRE_SOMMETS];
+//remplissage de la matrice
+           for (int i = 0; i < NOMBRE_SOMMETS; i++) {
+               Scanner scLigne = new Scanner(lignes.get(i));
+               for (int j = 0; j < NOMBRE_SOMMETS; j++) {
+                   if (scLigne.hasNextInt()) matrice[i][j] = scLigne.nextInt();
+                   else matrice[i][j] = 0;
+               }
+               scLigne.close();
+           }
+
+
+
+
+           System.out.println("Matrice " + NOMBRE_SOMMETS + "x" + NOMBRE_SOMMETS + " chargée.");
+
+
+       } catch (Exception e) {
+           System.out.println("Erreur lecture matrice.");
+       }
+   }
+
