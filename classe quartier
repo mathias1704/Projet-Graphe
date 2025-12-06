@@ -1,0 +1,11 @@
+public class Quartier {
+    String nom;//nom du quartier
+    double tonne;//quantité de déchets estimée en tonness
+    int degre;//nombre de quartier qui son voisin
+//constructeur
+    public Quartier(String nom, double tonne) {
+        this.nom = nom;
+        this.tonne = tonne;
+        this.degre = 0;
+    }
+}
