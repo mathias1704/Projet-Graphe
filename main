@@ -1,0 +1,125 @@
+import java.util.*;
+
+public class Main {
+    static ArrayList<ClientEncombrant> listeEncombrants = new ArrayList<>();
+
+    public static void main(String[] args) {
+        Scanner scanner = new Scanner(System.in);
+        while (true) {//menu principal
+            System.out.println("Géstion des Déchets: MENU PRINCIPAL");
+            System.out.println("1. Collectivité (Charger Plan, Travaux, Saisie)");
+            System.out.println("2. Entreprise (Calculs Itinéraires & Planning)");
+            System.out.println("0. Quitter");
+            System.out.print("Votre choix : ");
+
+            if (!scanner.hasNextInt()) {
+                scanner.next();
+                continue;
+            }
+            int choix = scanner.nextInt();
+
+            if (choix == 0) break;
+            else if (choix == 1) menuCollectivite(scanner);
+            else if (choix == 2) menuEntreprise(scanner);
+        }
+        scanner.close();
+    }
+//sous menu des collectivités
+    public static void menuCollectivite(Scanner sc) {
+        System.out.println("\nCollectivité");
+        System.out.println("1. Charger un fichier Plan");
+        System.out.println("2. Saisir Encombrants");
+        System.out.println("3. Signaler travaux (Bloquer une rue)");
+        System.out.println("4. Retour");
+        System.out.print("Choix : ");
+        int choix = sc.nextInt();
+
+        if (choix == 1) {
+            System.out.print("Entrez le nom du fichier (ex: matrice.txt) : ");
+            String nom = sc.next();
+            Graphe.chargerFichier(nom);
+        }
+        else if (choix == 2) {
+            if (Graphe.matrice == null) {
+                System.out.println("Erreur : rentrer une matrice");
+                return;
+            }
+            saisirEncombrants(sc);
+        }
+        else if (choix == 3) {
+            if (Graphe.matrice == null) {
+                System.out.println("Erreur: charger une matrice");
+                return;
+            }
+            System.out.println("Travaux");
+            System.out.print("Carrefour début : "); int arcdebut = sc.nextInt() - 1;
+            System.out.print("Carrefour fin   : "); int arcfin = sc.nextInt() - 1;
+            Graphe.supprimerRoute(arcdebut, arcfin);
+        }
+    }
+//sous menu des entreprises
+    public static void menuEntreprise(Scanner sc) {
+        System.out.println("\nEntreprise");
+        System.out.println("1. Collecte point de collecte ");
+        System.out.println("2. Collecte Encombrants");
+        System.out.println("3. Ramassage des déchets (Tous les arcs)");
+        System.out.println("4. Planning Semaine");
+        System.out.println("5. Configurer la capacité du camion (Actuel: " + Collecte.CAPACITE_MAX + ")");
+        System.out.print("Choix : ");
+        int choix = sc.nextInt();
+
+        if (choix==1 || choix==2 || choix==3) {
+            if (Graphe.matrice == null) {
+                System.out.println("Erreur : Aucune Matrice chargée.");
+                return;
+            }
+            if (choix==1) {
+                ArrayList<PointCollecte> point = Collecte.Collectes();
+                System.out.print("Algo (1=Voisin, 2=MST) : ");
+                if (sc.nextInt()==1) Collecte.PlusProcheVoisin(point);
+                else Collecte.MST(point);
+            }
+            if (choix==2) {
+                if (listeEncombrants.isEmpty())
+                    System.out.println("Aucun encombrant saisi.");
+                else Collecte.Encombrants(listeEncombrants);
+            }
+            if (choix==3) Collecte.passagedechet();
+        }
+
+        else if (choix==4) {
+            Collecte.Planification();
+        }
+
+        else if (choix==5) {
+            System.out.print("Entrez la nouvelle capacité max : ");
+            int nouvellecapacité = sc.nextInt();
+            Collecte.changerCapacite(nouvellecapacité);
+        }
+    }
+// saisie des cleints pour les encombrants
+    public static void saisirEncombrants(Scanner sc) {
+        System.out.println("Saisie:");
+        int max = Graphe.NOMBRE_SOMMETS;
+        while(true) {
+            System.out.print("Nom : "); String nom = sc.next();
+
+            if (nom.equalsIgnoreCase("fin"))
+                break;
+
+            System.out.print("Début : ");
+            int arcdebut = sc.nextInt()-1;
+
+            System.out.print("Fin : ");
+            int arcfin = sc.nextInt()-1;
+
+            if (arcdebut<0||arcdebut>=max||arcfin<0||arcfin>=max||Graphe.matrice[arcdebut][arcfin]==0) {
+                System.out.println("Route invalide.");
+                continue;
+            }
+            System.out.print("Dist : "); int distance = sc.nextInt();
+            listeEncombrants.add(new ClientEncombrant(nom, arcdebut, arcfin, distance));
+            System.out.println("Ajouté.");
+        }
+    }
+}
