@@ -1,0 +1,386 @@
+import java.util.*;
+
+public class Collecte {
+
+    static int CAPACITE_MAX = 20;//capacite du camion modifiable
+    static final int DEPOT = 0;
+
+//modifie la capacité du camion
+    public static void changerCapacite(int nouvelleCapacite) {
+        CAPACITE_MAX = nouvelleCapacite;
+        System.out.println(">> Capacité du camion mise à jour : " + CAPACITE_MAX + " unités.");
+    }
+//génere des points de collecte aléatoires
+    public static ArrayList<PointCollecte> Collectes() {
+        ArrayList<PointCollecte> liste = new ArrayList<>();
+
+        int[] candidats = {4, 10, 2, 7, 5};//sommet cible par défaut
+        int maxSommets = Graphe.NOMBRE_SOMMETS;
+
+        System.out.println("\nContenances :");
+        for (int n : candidats) {
+            if (n < maxSommets) {
+                int quantite = (int)(Math.random() * 6);//quantité de déchet aléatoire entre 0 et 5
+                liste.add(new PointCollecte(n, "S" + (n + 1), quantite));
+                System.out.println(" -S" + (n + 1) + " : " + quantite);
+            }
+        }
+        System.out.println("Capacité max actuelle : " + CAPACITE_MAX);
+        return liste;
+    }
+
+//algorithme du plus proche voisin
+    public static void PlusProcheVoisin(ArrayList<PointCollecte> avisiter) {
+        if (avisiter.isEmpty()) {
+            System.out.println("Aucun point valide.");
+            return;
+        }
+        int charge = 0;
+        int position = DEPOT;
+        int distTotale = 0;
+        List<Integer> chemin = new ArrayList<>(); chemin.add(DEPOT);
+
+        while (!avisiter.isEmpty()) {
+            PointCollecte proche = null;
+            int pluspetitedistance = Integer.MAX_VALUE;
+            //trouve le sommet le plus proche qui n'est pas encore visité
+            for (PointCollecte pointcollecte : avisiter) {
+                int d = Graphe.getDistance(position, pointcollecte.nSommet);
+                if (d < pluspetitedistance) {
+                    pluspetitedistance = d;
+                    proche = pointcollecte;
+                }
+            }
+            //est ce que le camion a encore assez de place
+            if (charge + proche.quantiteDechets <= CAPACITE_MAX) {
+                distTotale += pluspetitedistance;
+                ajouterChemin(chemin, position, proche.nSommet);
+                position = proche.nSommet; charge += proche.quantiteDechets;
+                avisiter.remove(proche);
+            } else {
+                //sinon retour au depot pour vider
+                int ret = Graphe.getDistance(position, DEPOT);
+                distTotale += ret;
+                ajouterChemin(chemin, position, DEPOT);
+                position = DEPOT; charge = 0;
+            }
+        }//retour final au depot
+        if (position != DEPOT) {
+            int retour = Graphe.getDistance(position, DEPOT);
+            distTotale += retour; ajouterChemin(chemin, position, DEPOT);
+        }
+        afficherResultat(chemin, distTotale);
+    }
+//algortihme mst
+    public static void MST(ArrayList<PointCollecte> pointsClients) {
+        if (pointsClients.isEmpty()) {
+            System.out.println("Aucun point.");
+            return;
+        }
+        System.out.println("\ncalcul par approche du MST");
+
+        ArrayList<PointCollecte> t = new ArrayList<>();
+        t.add(new PointCollecte(DEPOT, "Dépôt", 0));
+        t.addAll(pointsClients);
+        int N = t.size();
+//création de l'arbre couvrant de poid minimum
+        int[][] graphe = new int[N][N];
+        for (int i=0; i<N; i++) for (int j=0; j<N; j++)
+            graphe[i][j] = (i==j) ? 0 : Graphe.getDistance(t.get(i).nSommet, t.get(j).nSommet);
+//Algorithme de Prim pour créer le MST
+        int[] avant = new int[N], key = new int[N];
+        boolean[] MSTmodif = new boolean[N];
+
+        Arrays.fill(key, Integer.MAX_VALUE); key[0]=0; avant[0]=-1;
+
+        for (int c=0; c<N-1; c++) {
+            int u=-1, min=Integer.MAX_VALUE;
+            for (int v=0; v<N; v++)
+                if (!MSTmodif[v] && key[v]<min) {
+                    min=key[v]; u=v;
+                }
+            if (u==-1) break; MSTmodif[u]=true;
+            for (int v=0; v<N; v++)
+                if (graphe[u][v]!=0 && !MSTmodif[v] && graphe[u][v]<key[v]) {
+                    avant[v]=u; key[v]=graphe[u][v];
+                }
+        }
+//Parcours en profondeur de l'arbre
+        ArrayList<ArrayList<Integer>> adj = new ArrayList<>();
+        for (int i=0; i<N; i++) adj.add(new ArrayList<>());
+        for (int i=1; i<N; i++) adj.get(avant[i]).add(i);
+        ArrayList<Integer> ordre = new ArrayList<>(); dfs(0, adj, ordre);
+//Simulation du camion avec le MST
+        int charge=0, position=DEPOT, dist=0;
+        List<Integer> trace = new ArrayList<>(); trace.add(DEPOT);
+
+        for (int i=1; i<ordre.size(); i++) {
+            PointCollecte cib = t.get(ordre.get(i));
+            if (charge + cib.quantiteDechets > CAPACITE_MAX) {
+                dist += Graphe.getDistance(position, DEPOT);
+                ajouterChemin(trace, position, DEPOT); position=DEPOT; charge=0;
+            }
+            dist += Graphe.getDistance(position, cib.nSommet);
+            ajouterChemin(trace, position, cib.nSommet);
+            position = cib.nSommet; charge += cib.quantiteDechets;
+        }
+        if (position != DEPOT) {
+            dist += Graphe.getDistance(position, DEPOT);
+            ajouterChemin(trace, position, DEPOT);
+        }
+        afficherResultat(trace, dist);
+    }
+//tournée des encombrants
+    public static void Encombrants(ArrayList<ClientEncombrant> liste) {
+        if (liste.isEmpty()) {
+            System.out.println("Liste vide.");
+            return;
+        }
+        System.out.println("\nTournée des encombrants");
+        ArrayList<ClientEncombrant> reste = new ArrayList<>(liste);
+        int pos = DEPOT;
+        int dist = 0;
+        List<Integer> passage = new ArrayList<>();
+        passage.add(DEPOT);
+
+        while (!reste.isEmpty()) {
+            ClientEncombrant best = null;
+            int minDst = Integer.MAX_VALUE;
+            //trouver le client dont le début de la rue est le plus proche
+            for (ClientEncombrant clientencombrant : reste) {
+                int distance = Graphe.getDistance(pos, clientencombrant.Debut);
+                if (distance < minDst) {
+                    minDst = distance; best = clientencombrant;
+                }
+            }
+            dist += minDst;
+            ajouterChemin(passage, pos, best.Debut);//aller au début
+
+            int rue = Graphe.matrice[best.Debut][best.Fin];
+            dist += rue;
+            passage.add(best.Fin);//traverser la rue
+
+            System.out.println(" Ramassage " + best.nom + " (Rue " + (best.Debut +1) + "->" + (best.Fin +1) + ")");
+            pos = best.Fin;
+            reste.remove(best);
+        }
+        dist += Graphe.getDistance(pos, DEPOT);
+        ajouterChemin(passage, pos, DEPOT);
+        afficherResultat(passage, dist);
+    }
+
+//algorithme d'Euler passage par tous les arcs
+    public static void passagedechet() {
+        System.out.println("\nRamassage des déchets (passage par tous les arcs)");
+        int N = Graphe.NOMBRE_SOMMETS;
+        int[][] aFaire = new int[N][N];//Matrice des arcs à visiter
+        int totalArcs = 0;
+        int[] outdepart = new int[N];
+        int []intdepart = new int[N];
+        // Calcul de degré
+        for(int u=0; u<N; u++) for(int v=0; v<N; v++)
+            if(Graphe.matrice[u][v]>0 && Graphe.matrice[v][u]==0) {
+                outdepart[u]++;
+                intdepart[v]++;
+            }
+            //Orientation des arcs
+        for (int u=0; u<N; u++) for (int v=0; v<N; v++) {
+            if (Graphe.matrice[u][v] > 0) {
+                boolean dble = (Graphe.matrice[v][u] > 0);
+                if (!dble) {
+                    aFaire[u][v]=1;
+                    totalArcs++;
+                }
+                else if (u < v) {//double sens: on choisit le sens qui équilibre au mieux
+                    if (outdepart[u] > intdepart[u]) {
+                        aFaire[v][u]=1;
+                        outdepart[v]++;
+                        intdepart[u]++;
+                    }
+                    else {
+                        aFaire[u][v]=1;
+                        outdepart[u]++;
+                        intdepart[v]++;
+                    }
+                    totalArcs++;
+                }
+            }
+        }
+        //Navigation
+        List<Integer> it = new ArrayList<>();
+        it.add(DEPOT);
+        int position  = DEPOT;
+        int faits = 0;
+
+        while (faits < totalArcs) {
+            int next = -1;
+            //chercher une route à faire depuis a ma position
+            for (int v=0; v<N; v++)
+                if (aFaire[position ][v] > 0)
+            {
+                next = v;
+                break;
+            }
+
+            if (next != -1) {
+                it.add(next);
+                aFaire[position ][next]--;
+                faits++;
+                position  = next;
+            } else {
+                //si pas de solution chercher le sommet le plus proche
+                int cible = -1, minimaldepart = Integer.MAX_VALUE;
+                for (int i=0; i<N; i++) {
+                    boolean actif = false;
+                    for(int j=0; j<N; j++) if(aFaire[i][j]>0) actif=true;
+                    if(actif) {
+                        int d = Graphe.getDistance(position , i);
+                        if(d < minimaldepart) {
+                            minimaldepart=d; cible=i;
+                        }
+                    }
+                }
+                if (cible == -1) break;
+                List<Integer> tr = Graphe.getChemin(position , cible);
+                for(int k=1; k<tr.size(); k++) it.add(tr.get(k));
+                position  = cible;
+            }
+        }
+        if (position  != DEPOT) {
+            List<Integer> tr = Graphe.getChemin(position , DEPOT);
+            for(int k=1; k<tr.size(); k++) it.add(tr.get(k));
+        }
+        //affichage final
+        System.out.println("\nItinéraire complet");
+        int distanceTotal = 0;
+        StringBuilder sb = new StringBuilder();
+        for (int i=0; i<it.size(); i++) {
+            sb.append(it.get(i)+1);
+            if (i < it.size()-1) {
+                sb.append(" -> ");
+                int u = it.get(i), v = it.get(i+1);
+                distanceTotal += (Graphe.matrice[u][v]>0) ? Graphe.matrice[u][v] : Graphe.getDistance(u,v);
+            }
+        }
+        System.out.println(sb.toString());
+        System.out.println("distance : " + distanceTotal + "m");
+    }
+
+    //Algorithme de planification des ramassages dans different quartier (Welsh et Powell)
+    public static void Planification() {
+
+        Map<String, List<String>> graphe = new HashMap<>();
+         //construction du graphe de voisinage
+        if (!Graphe.grapheVoisins.isEmpty()) {
+            graphe = Graphe.grapheVoisins;//depuis le fichier qui est une liste
+        }
+        else if (Graphe.matrice != null) {
+            System.out.println("Planning basé sur la Matrice (" + Graphe.NOMBRE_SOMMETS + " secteurs).");
+            int N = Graphe.NOMBRE_SOMMETS;
+            //convertir des matrices en graphe de voisinage
+            for (int i = 0; i < N; i++) {
+                String nomI = "Secteur " + (i + 1);
+                if (!graphe.containsKey(nomI)) {
+                    graphe.put(nomI, new ArrayList<>());
+                }
+
+                for (int j = 0; j < N; j++) {
+                    if (i != j && (Graphe.matrice[i][j] > 0 || Graphe.matrice[j][i] > 0)) {
+                        String nomJ = "Secteur " + (j + 1);
+                        graphe.get(nomI).add(nomJ);
+                    }
+                }
+            }
+        }
+        else {
+            System.out.println("Aucun fichier chargé. Allez dans Collectivité.");
+            return;
+        }
+
+        System.out.println("\nPlanning tournée");
+
+        List<Quartier> l = new ArrayList<>();
+        for (String nom : graphe.keySet()) {
+            double t = 45.0 * (0.9 + Math.random()*0.2);
+            Quartier q = new Quartier(nom, t);
+            q.degre = graphe.get(nom).size();
+            l.add(q);
+        }
+        //tri par degré décroissant
+        l.sort((a,b)->Integer.compare(b.degre, a.degre));
+        // attribution des jours
+        Map<Integer, List<Quartier>> plan = new HashMap<>();
+
+        for (Quartier quartier1 : l) {
+            int j = 1;
+            while (true) {
+
+                if (!plan.containsKey(j)) {
+                    plan.put(j, new ArrayList<>());
+                }
+
+                List<Quartier> quartier = plan.get(j);
+
+                boolean conflit = false;
+                List<String> voisins = graphe.get(quartier1.nom);
+                //premiere contrainte pas de voisinage le meme jour
+                for (Quartier exist : quartier) {
+                    if (voisins.contains(exist.nom)) {
+                        conflit = true;
+                        break;
+                    }
+                }
+               //contrainte deux capacités de camions limité a 12
+                double tot = 0; for(Quartier x:quartier) tot+=x.tonne;
+                boolean conflitC = (tot + quartier1.tonne > 12 * CAPACITE_MAX);
+
+                if (!conflit && !conflitC) {
+                    quartier.add(quartier1); break;
+                }
+                j++;
+            }
+        }
+
+        //affichage du résultat
+        List<Integer> keys = new ArrayList<>(plan.keySet()); Collections.sort(keys);
+        for(int j : keys) {
+            System.out.println("\nJOUR " + j);
+            double s=0;
+            for(Quartier q : plan.get(j)) {
+                System.out.printf(" - %-20s : %.1ft\n", q.nom, q.tonne); s+=q.tonne;
+            }
+            System.out.printf(" TOTAL: %.1ft -> %d camions\n", s, (int)Math.ceil(s/(double)CAPACITE_MAX));
+        }
+    }
+
+
+    private static void dfs(int u, ArrayList<ArrayList<Integer>> adj, ArrayList<Integer> r)
+    {
+        r.add(u);
+        for(int v:adj.get(u)) dfs(v, adj, r);
+    }
+    private static void ajouterChemin(List<Integer> tr, int d, int a) {
+        List<Integer> s = Graphe.getChemin(d, a);
+        for(int i = 1; i < s.size(); i++) {
+            tr.add(s.get(i));
+        }
+    }
+    private static void afficherResultat(List<Integer> t, int d) {
+        System.out.println("\nItinéraire détaillé :");
+
+        if (t.isEmpty()) {
+            System.out.println("(Aucun chemin)");
+        } else {
+            StringBuilder sb = new StringBuilder();
+            for(int i = 0; i < t.size(); i++) {
+                sb.append(t.get(i) + 1); //pour afficher 1 comme sommet de départ et non 0
+
+                if(i < t.size() - 1) {
+                    sb.append(" -> "); // Flèche entre les étapes
+                }
+            }
+            System.out.println(sb.toString());
+        }
+
+        System.out.println("Distance totale : " + d + "m");
+    }
